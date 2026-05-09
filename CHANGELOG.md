@@ -1,3 +1,7 @@
+## 0.1.2
+
+- Fix README example to use two-param route builder.
+
 ## 0.1.1
 
 - ViewModels no longer need to extend `ChangeNotifier` — plain classes work with `.obs` + `Obs`.

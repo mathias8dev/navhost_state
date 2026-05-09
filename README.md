@@ -110,7 +110,7 @@ You can use `ViewModelScope` directly without `rxRoutes()`:
 ```dart
 NavRoute(
   '/counter',
-  (_) => ViewModelScope(
+  (_, _) => ViewModelScope(
     child: CounterPage(),
   ),
 )
