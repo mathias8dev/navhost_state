@@ -20,6 +20,71 @@ void main() {
       final count = 42.obs;
       expect(count.toString(), 'Rx(42)');
     });
+
+  });
+
+  group('Rx with complex types', () {
+    testWidgets('Rx<List> rebuilds on new list assignment', (tester) async {
+      final items = Rx<List<String>>([]);
+      var builds = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Obs(() {
+            builds++;
+            return Text('count:${items.value.length}');
+          }),
+        ),
+      );
+      expect(builds, 1);
+      expect(find.text('count:0'), findsOneWidget);
+
+      items.value = ['a', 'b'];
+      await tester.pump();
+      expect(builds, 2);
+      expect(find.text('count:2'), findsOneWidget);
+    });
+
+    testWidgets('Rx<List> does not rebuild on same-reference reassignment',
+        (tester) async {
+      final items = Rx<List<String>>(['a']);
+      var builds = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Obs(() {
+            builds++;
+            return Text('count:${items.value.length}');
+          }),
+        ),
+      );
+      expect(builds, 1);
+
+      items.value.add('b');
+      items.value = items.value;
+      await tester.pump();
+      expect(builds, 1);
+    });
+
+    testWidgets('Rx<Map> rebuilds on new map assignment', (tester) async {
+      final data = Rx<Map<String, int>>({});
+      var builds = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Obs(() {
+            builds++;
+            return Text('keys:${data.value.keys.join(',')}');
+          }),
+        ),
+      );
+      expect(builds, 1);
+
+      data.value = {'a': 1, 'b': 2};
+      await tester.pump();
+      expect(builds, 2);
+      expect(find.text('keys:a,b'), findsOneWidget);
+    });
   });
 
   group('Obs widget', () {
