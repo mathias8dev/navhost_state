@@ -351,10 +351,10 @@ void main() {
         routes: [
           NavRoute(
               '/',
-              (_) => Obs(() => Text('home:${shared.value}'))),
+              (_, _) => Obs(() => Text('home:${shared.value}'))),
           NavRoute(
               '/other',
-              (_) => Obs(() => Text('other:${shared.value}'))),
+              (_, _) => Obs(() => Text('other:${shared.value}'))),
         ],
       );
 
@@ -386,11 +386,11 @@ void main() {
         routes: rxRoutes([
           NavRoute(
               '/',
-              (_) => Builder(builder: (context) {
+              (_, _) => Builder(builder: (context) {
                     final vm = context.viewModel(() => _TestViewModel());
                     return Text('count:${vm.count}');
                   })),
-          NavRoute('/b', (_) => const Text('B')),
+          NavRoute('/b', (_, _) => const Text('B')),
         ]),
       );
       _TestViewModel.reset();
@@ -410,10 +410,10 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_) => const Text('Home')),
+          NavRoute('/', (_, _) => const Text('Home')),
           NavRoute(
               '/detail',
-              (_) => Builder(builder: (context) {
+              (_, _) => Builder(builder: (context) {
                     final vm = context.viewModel(() => _TestViewModel());
                     return Text('count:${vm.count}');
                   })),
@@ -442,17 +442,17 @@ void main() {
         routes: rxRoutes([
           NavRoute(
               '/',
-              (_) => Builder(builder: (context) {
+              (_, _) => Builder(builder: (context) {
                     context.viewModel(() => _TestViewModel());
                     return const Text('Home');
                   })),
           NavRoute(
               '/a',
-              (_) => Builder(builder: (context) {
+              (_, _) => Builder(builder: (context) {
                     context.viewModel(() => _TestViewModel());
                     return const Text('A');
                   })),
-          NavRoute('/b', (_) => const Text('B')),
+          NavRoute('/b', (_, _) => const Text('B')),
         ]),
       );
       _TestViewModel.reset();
@@ -478,13 +478,13 @@ void main() {
         routes: rxRoutes([
           NavRoute(
               '/',
-              (_) => Builder(builder: (context) {
+              (_, _) => Builder(builder: (context) {
                     homeVm = context.viewModel(() => _TestViewModel());
                     return const Text('Home');
                   })),
           NavRoute(
               '/detail',
-              (_) => Builder(builder: (context) {
+              (_, _) => Builder(builder: (context) {
                     detailVm = context.viewModel(() => _TestViewModel());
                     return const Text('Detail');
                   })),
@@ -507,22 +507,22 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_) => const Text('Home')),
+          NavRoute('/', (_, _) => const Text('Home')),
           NavRoute(
               '/a',
-              (_) => Builder(builder: (context) {
+              (_, _) => Builder(builder: (context) {
                     context.viewModel(() => _TestViewModel());
                     return const Text('A');
                   })),
           NavRoute(
               '/b',
-              (_) => Builder(builder: (context) {
+              (_, _) => Builder(builder: (context) {
                     context.viewModel(() => _TestViewModel());
                     return const Text('B');
                   })),
           NavRoute(
               '/c',
-              (_) => Builder(builder: (context) {
+              (_, _) => Builder(builder: (context) {
                     context.viewModel(() => _TestViewModel());
                     return const Text('C');
                   })),
@@ -552,7 +552,7 @@ void main() {
         routes: rxRoutes([
           NavRoute(
             '/',
-            (_) => ViewModelBuilder<_TestViewModel>(
+            (_, _) => ViewModelBuilder<_TestViewModel>(
               factory: () => _TestViewModel(),
               builder: (context, vm, child) => Column(children: [
                 Text('count:${vm.count}'),
@@ -584,7 +584,7 @@ void main() {
         routes: [
           NavRoute(
             '/',
-            (_) => ViewModelScope(
+            (_, _) => ViewModelScope(
               child: Builder(builder: (context) {
                 final vm = context.viewModel(() => _TestViewModel());
                 return Text('count:${vm.count}');
@@ -610,7 +610,7 @@ void main() {
         routes: rxRoutes([
           NavRoute(
               '/',
-              (_) => Builder(builder: (context) {
+              (_, _) => Builder(builder: (context) {
                     final vm = context.viewModel(() => _PlainViewModel());
                     return Obs(() => Text('count:${vm.count.value}'));
                   })),
@@ -635,7 +635,7 @@ void main() {
         routes: rxRoutes([
           NavRoute(
               '/',
-              (_) => Builder(builder: (context) {
+              (_, _) => Builder(builder: (context) {
                     final vm = context.viewModel(() => _PlainViewModel());
                     return Obs(() => Text('count:${vm.count.value}'));
                   })),
@@ -658,10 +658,10 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_) => const Text('Home')),
+          NavRoute('/', (_, _) => const Text('Home')),
           NavRoute(
               '/detail',
-              (_) => Builder(builder: (context) {
+              (_, _) => Builder(builder: (context) {
                     context.viewModel(() => _PlainViewModel());
                     return const Text('Detail');
                   })),
@@ -691,7 +691,7 @@ void main() {
         routes: rxRoutes([
           NavRoute(
               '/',
-              (_) => Builder(builder: (context) {
+              (_, _) => Builder(builder: (context) {
                     final vm = context.viewModel(() => _CounterViewModel());
                     return Obs(() => Text('count:${vm.count.value}'));
                   })),

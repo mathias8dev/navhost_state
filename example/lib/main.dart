@@ -22,11 +22,11 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   final _navController = NavController(
     routes: rxRoutes([
-      NavRoute('/', (_) => const ShowcasePage()),
-      NavRoute('/counter', (_) => const CounterPage()),
-      NavRoute('/vm-builder', (_) => const VmBuilderPage()),
-      NavRoute('/multi-observer', (_) => const MultiObserverPage()),
-      NavRoute('/todo', (_) => const TodoPage()),
+      NavRoute('/', (_, _) => const ShowcasePage()),
+      NavRoute('/counter', (_, _) => const CounterPage()),
+      NavRoute('/vm-builder', (_, _) => const VmBuilderPage()),
+      NavRoute('/multi-observer', (_, _) => const MultiObserverPage()),
+      NavRoute('/todo', (_, _) => const TodoPage()),
     ]),
   );
 

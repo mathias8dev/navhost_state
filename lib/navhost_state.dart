@@ -13,7 +13,7 @@
 ///
 /// // Wrap routes with rxRoutes for automatic scoping:
 /// final nav = NavController(routes: rxRoutes([
-///   NavRoute('/', (_) => CounterPage()),
+///   NavRoute('/', (_, _) => CounterPage()),
 /// ]));
 ///
 /// // In a route widget:

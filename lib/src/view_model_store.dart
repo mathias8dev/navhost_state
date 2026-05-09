@@ -11,7 +11,7 @@ import 'package:navhost/navhost.dart';
 /// [ViewModelScope], or add one manually:
 ///
 /// ```dart
-/// NavRoute('/counter', (_) => ViewModelScope(child: CounterPage()))
+/// NavRoute('/counter', (_, _) => ViewModelScope(child: CounterPage()))
 /// ```
 class ViewModelScope extends StatefulWidget {
   /// The child widget that can access scoped ViewModels via
@@ -92,8 +92,8 @@ extension ViewModelContextExtension on BuildContext {
 /// ```dart
 /// final nav = NavController(
 ///   routes: rxRoutes([
-///     NavRoute('/', (_) => HomePage()),
-///     NavRoute('/detail/:id', (p) => DetailPage(id: p['id']!)),
+///     NavRoute('/', (_, _) => HomePage()),
+///     NavRoute('/detail/:id', (p, _) => DetailPage(id: p['id']!)),
 ///   ]),
 /// );
 /// ```
@@ -101,7 +101,8 @@ List<NavRoute> rxRoutes(List<NavRoute> routes) {
   return routes
       .map((route) => NavRoute(
             route.path,
-            (params) => ViewModelScope(child: route.builder(params)),
+            (params, queryParams) =>
+                ViewModelScope(child: route.builder(params, queryParams)),
             enterTransition: route.enterTransition,
             exitTransition: route.exitTransition,
             popEnterTransition: route.popEnterTransition,
