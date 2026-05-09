@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:navhost/navhost.dart';
 import 'package:navhost_state/navhost_state.dart';
 
-class CounterViewModel extends ChangeNotifier {
+class CounterViewModel {
   final count = 0.obs;
 
   void increment() => count.value++;

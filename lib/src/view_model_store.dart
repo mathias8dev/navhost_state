@@ -1,8 +1,11 @@
 import 'package:flutter/widgets.dart';
 import 'package:navhost/navhost.dart';
 
-/// A scope that retains [ChangeNotifier] ViewModels across rebuilds and
-/// disposes them when this widget is removed from the tree.
+/// A scope that retains ViewModels across rebuilds and cleans them up when
+/// this widget is removed from the tree.
+///
+/// ViewModels can be any object. If a stored object is a [ChangeNotifier],
+/// its [ChangeNotifier.dispose] method is called automatically on cleanup.
 ///
 /// Use [rxRoutes] to automatically wrap every [NavRoute] with a
 /// [ViewModelScope], or add one manually:
@@ -23,16 +26,16 @@ class ViewModelScope extends StatefulWidget {
 }
 
 class _ViewModelScopeState extends State<ViewModelScope> {
-  final _models = <Type, ChangeNotifier>{};
+  final _models = <Type, Object>{};
 
-  T getOrCreate<T extends ChangeNotifier>(T Function() factory) {
+  T getOrCreate<T extends Object>(T Function() factory) {
     return _models.putIfAbsent(T, factory) as T;
   }
 
   @override
   void dispose() {
     for (final vm in _models.values) {
-      vm.dispose();
+      if (vm is ChangeNotifier) vm.dispose();
     }
     _models.clear();
     super.dispose();
@@ -59,16 +62,19 @@ class _ViewModelScopeInherited extends InheritedWidget {
 
 /// Convenience extensions on [BuildContext] for scoped ViewModel access.
 extension ViewModelContextExtension on BuildContext {
-  /// Returns a scoped [ChangeNotifier] tied to the nearest [ViewModelScope].
+  /// Returns a scoped object tied to the nearest [ViewModelScope].
   ///
-  /// The ViewModel is created once via [factory] and reused on subsequent
-  /// calls. It is automatically disposed when the enclosing [ViewModelScope]
-  /// is removed from the widget tree (e.g. when the route is popped).
+  /// The ViewModel can be any object — it does not need to extend
+  /// [ChangeNotifier]. Use `.obs` fields and [Obs] for reactivity instead.
+  ///
+  /// The object is created once via [factory] and reused on subsequent
+  /// calls. If it is a [ChangeNotifier], it is automatically disposed when
+  /// the enclosing [ViewModelScope] is removed from the widget tree.
   ///
   /// ```dart
   /// final vm = context.viewModel(() => CounterViewModel());
   /// ```
-  T viewModel<T extends ChangeNotifier>(T Function() factory) {
+  T viewModel<T extends Object>(T Function() factory) {
     final inherited =
         dependOnInheritedWidgetOfExactType<_ViewModelScopeInherited>();
     assert(

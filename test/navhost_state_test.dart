@@ -538,6 +538,86 @@ void main() {
     });
   });
 
+  group('Plain class ViewModel (no ChangeNotifier)', () {
+    testWidgets('works with context.viewModel and Obs', (tester) async {
+      final nav = NavController(
+        initialRoute: '/',
+        routes: rxRoutes([
+          NavRoute(
+              '/',
+              (_) => Builder(builder: (context) {
+                    final vm = context.viewModel(() => _PlainViewModel());
+                    return Obs(() => Text('count:${vm.count.value}'));
+                  })),
+        ]),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: NavHost(navController: nav)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('count:0'), findsOneWidget);
+
+      _PlainViewModel.lastInstance!.increment();
+      await tester.pump();
+      expect(find.text('count:1'), findsOneWidget);
+    });
+
+    testWidgets('same instance reused across rebuilds', (tester) async {
+      _PlainViewModel.instanceCount = 0;
+      final nav = NavController(
+        initialRoute: '/',
+        routes: rxRoutes([
+          NavRoute(
+              '/',
+              (_) => Builder(builder: (context) {
+                    final vm = context.viewModel(() => _PlainViewModel());
+                    return Obs(() => Text('count:${vm.count.value}'));
+                  })),
+        ]),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: NavHost(navController: nav)),
+      );
+      await tester.pumpAndSettle();
+      expect(_PlainViewModel.instanceCount, 1);
+
+      nav.notifyListeners();
+      await tester.pumpAndSettle();
+      expect(_PlainViewModel.instanceCount, 1);
+    });
+
+    testWidgets('does not crash on dispose (no dispose method)',
+        (tester) async {
+      final nav = NavController(
+        initialRoute: '/',
+        routes: rxRoutes([
+          NavRoute('/', (_) => const Text('Home')),
+          NavRoute(
+              '/detail',
+              (_) => Builder(builder: (context) {
+                    context.viewModel(() => _PlainViewModel());
+                    return const Text('Detail');
+                  })),
+        ]),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: NavHost(navController: nav)),
+      );
+      await tester.pumpAndSettle();
+
+      nav.navigate('/detail');
+      await tester.pumpAndSettle();
+
+      // Pop should not throw — plain objects are just dropped
+      nav.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('Home'), findsOneWidget);
+    });
+  });
+
   group('Obs + viewModel integration', () {
     testWidgets('Obs rebuilds on Rx change inside scoped ViewModel',
         (tester) async {
@@ -591,6 +671,20 @@ class _TestViewModel extends ChangeNotifier {
     disposeCount++;
     super.dispose();
   }
+}
+
+class _PlainViewModel {
+  static _PlainViewModel? lastInstance;
+  static int instanceCount = 0;
+
+  final count = 0.obs;
+
+  _PlainViewModel() {
+    lastInstance = this;
+    instanceCount++;
+  }
+
+  void increment() => count.value++;
 }
 
 class _CounterViewModel extends ChangeNotifier {

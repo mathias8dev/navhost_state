@@ -3,7 +3,8 @@ import 'package:flutter/widgets.dart';
 import 'view_model_store.dart';
 
 /// A convenience widget that creates a scoped [ChangeNotifier] and rebuilds
-/// when it notifies.
+/// when it notifies. For plain (non-[ChangeNotifier]) ViewModels, use
+/// [ViewModelContextExtension.viewModel] with [Obs] instead.
 ///
 /// Combines [ViewModelContextExtension.viewModel] with [ListenableBuilder]
 /// so you don't need to wire them up manually.

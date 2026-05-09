@@ -9,7 +9,7 @@ Reactive state management for [navhost](https://github.com/mathias8dev/navhost).
 - **`.obs` reactive values** — wrap any value in `Rx<T>` with `0.obs`, `'hello'.obs`, `false.obs`
 - **`Obs` auto-tracking widget** — rebuilds only when the `Rx` values read inside it change
 - **Fine-grained rebuilds** — each `Obs` tracks its own dependencies independently
-- **Scoped ViewModels** — `context.viewModel()` creates once, reuses across rebuilds, disposes on unmount
+- **Scoped ViewModels** — `context.viewModel()` creates once, reuses across rebuilds, auto-cleans on unmount
 - **`ViewModelScope`** — ties ViewModel lifecycle to the widget tree
 - **`rxRoutes()`** — wraps all navhost routes with `ViewModelScope` automatically
 - **`ViewModelBuilder`** — convenience widget that creates + subscribes in one step
@@ -58,12 +58,16 @@ Each `Obs` tracks only the `Rx` values it actually reads — unrelated changes d
 
 ### ViewModel with `.obs`
 
+ViewModels don't need to extend `ChangeNotifier`. Plain classes work perfectly with `.obs` + `Obs`:
+
 ```dart
-class CounterViewModel extends ChangeNotifier {
+class CounterViewModel {
   final count = 0.obs;
   void increment() => count.value++;
 }
 ```
+
+`ViewModelBuilder` and `Listen` still require `ChangeNotifier` because they use `ListenableBuilder` internally. For plain class ViewModels, use `context.viewModel()` + `Obs` instead.
 
 ### Scoped ViewModel with `rxRoutes`
 
