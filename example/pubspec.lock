@@ -132,12 +132,13 @@ packages:
     source: hosted
     version: "1.17.0"
   navhost:
-    dependency: "direct main"
+    dependency: transitive
     description:
-      path: "../../navhost"
-      relative: true
-    source: path
-    version: "0.1.1"
+      name: navhost
+      sha256: "654afbfdaaf8426e06486d22bb8156bfb1f38e242a9b51bacfda6e9edc219352"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.2"
   navhost_state:
     dependency: "direct main"
     description:

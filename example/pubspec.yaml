@@ -9,8 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  navhost:
-    path: ../../navhost
   navhost_state:
     path: ../
   cupertino_icons: ^1.0.8
