@@ -76,8 +76,8 @@ class CounterViewModel {
 ```dart
 final nav = NavController(
   routes: rxRoutes([
-    NavRoute('/', (_) => const CounterPage()),
-    NavRoute('/detail/:id', (p) => DetailPage(id: p['id']!)),
+    NavRoute('/', (_, _) => const CounterPage()),
+    NavRoute('/detail/:id', (p, _) => DetailPage(id: p['id']!)),
   ]),
 );
 ```
