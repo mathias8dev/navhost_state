@@ -1,3 +1,7 @@
+## 0.1.3
+
+- Update README install snippet to reference latest versions.
+
 ## 0.1.2
 
 - Fix README example to use two-param route builder.

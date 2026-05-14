@@ -19,8 +19,8 @@ Reactive state management for [navhost](https://github.com/mathias8dev/navhost).
 
 ```yaml
 dependencies:
-  navhost: ^0.1.0
-  navhost_state: ^0.1.0
+  navhost: ^latest
+  navhost_state: ^latest
 ```
 
 ```dart
