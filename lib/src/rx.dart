@@ -1,4 +1,16 @@
+import 'dart:async';
+
+import 'package:collection/collection.dart';
 import 'package:flutter/widgets.dart';
+
+import 'collection_extensions.dart';
+
+part 'obs.dart';
+part 'obs_builder.dart';
+part 'computed.dart';
+part 'effect.dart';
+part 'rx_collections.dart';
+part 'rx_stream.dart';
 
 /// A reactive wrapper around a value of type [T].
 ///
@@ -26,11 +38,11 @@ class Rx<T> {
   set value(T newValue) {
     if (_value != newValue) {
       _value = newValue;
-      for (final cb in Set.of(_listeners)) {
-        cb();
-      }
+      _notify();
     }
   }
+
+  void _notify() => _BatchManager._dispatch(_listeners);
 
   void _addListener(VoidCallback cb) => _listeners.add(cb);
   void _removeListener(VoidCallback cb) => _listeners.remove(cb);
@@ -51,64 +63,73 @@ extension RxExtension<T> on T {
   Rx<T> get obs => Rx<T>(this);
 }
 
+/// Convenience methods on [Rx].
+///
+/// ```dart
+/// final count = 0.obs;
+/// count.update((prev) => prev + 1);
+///
+/// final items = Rx<List<String>>([]);
+/// items.update((prev) => [...prev, 'new item']);
+/// ```
+extension RxUpdateExtension<T> on Rx<T> {
+  /// Updates the value by applying [updater] to the current value.
+  ///
+  /// Equivalent to `rx.value = updater(rx.value)`, but reads the previous
+  /// value without registering a tracking dependency.
+  void update(T Function(T previous) updater) {
+    value = updater(_value);
+  }
+}
+
 class _RxTracker {
   static _RxTracker? current;
   final Set<Rx> _tracked = {};
   void track(Rx rx) => _tracked.add(rx);
 }
 
-/// A widget that automatically rebuilds when any [Rx] value read inside
-/// its [builder] changes.
+class _BatchManager {
+  static int _depth = 0;
+  static final Set<VoidCallback> _pending = {};
+
+  static void _dispatch(Set<VoidCallback> listeners) {
+    if (_depth > 0) {
+      _pending.addAll(listeners);
+    } else {
+      for (final cb in Set.of(listeners)) {
+        cb();
+      }
+    }
+  }
+
+  static void _flush() {
+    if (--_depth == 0) {
+      final callbacks = Set.of(_pending);
+      _pending.clear();
+      for (final cb in callbacks) {
+        cb();
+      }
+    }
+  }
+}
+
+/// Defers all [Rx] notifications produced inside [fn] and flushes them
+/// together once [fn] returns. Nested calls are safe — the flush happens
+/// only when the outermost batch completes.
 ///
 /// ```dart
-/// final count = 0.obs;
-///
-/// Obs(() => Text('${count.value}'))
+/// batch(() {
+///   _firstName.value = 'Jane';
+///   _lastName.value  = 'Doe';
+///   _age.value       = 30;
+/// }); // one rebuild instead of three
 /// ```
-///
-/// Only the [Rx] values accessed during [builder] are tracked — if a value
-/// is conditionally read, the subscription updates on each rebuild.
-class Obs extends StatefulWidget {
-  /// Builder that returns the widget tree. Any [Rx.value] read inside
-  /// is automatically tracked.
-  final Widget Function() builder;
-
-  /// Creates an [Obs] widget that rebuilds when tracked [Rx] values change.
-  const Obs(this.builder, {super.key});
-
-  @override
-  State<Obs> createState() => _ObsState();
-}
-
-class _ObsState extends State<Obs> {
-  Set<Rx> _subscriptions = {};
-
-  void _rebuild() => setState(() {});
-
-  @override
-  Widget build(BuildContext context) {
-    for (final rx in _subscriptions) {
-      rx._removeListener(_rebuild);
-    }
-
-    final tracker = _RxTracker();
-    _RxTracker.current = tracker;
-    final result = widget.builder();
-    _RxTracker.current = null;
-
-    _subscriptions = tracker._tracked;
-    for (final rx in _subscriptions) {
-      rx._addListener(_rebuild);
-    }
-
-    return result;
-  }
-
-  @override
-  void dispose() {
-    for (final rx in _subscriptions) {
-      rx._removeListener(_rebuild);
-    }
-    super.dispose();
+void batch(void Function() fn) {
+  _BatchManager._depth++;
+  try {
+    fn();
+  } finally {
+    _BatchManager._flush();
   }
 }
+

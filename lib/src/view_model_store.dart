@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:navhost/navhost.dart';
 
+import 'view_model.dart';
+
 /// A scope that retains ViewModels across rebuilds and cleans them up when
 /// this widget is removed from the tree.
 ///
@@ -29,12 +31,17 @@ class _ViewModelScopeState extends State<ViewModelScope> {
   final _models = <Type, Object>{};
 
   T getOrCreate<T extends Object>(T Function() factory) {
-    return _models.putIfAbsent(T, factory) as T;
+    if (_models.containsKey(T)) return _models[T] as T;
+    final vm = factory();
+    _models[T] = vm;
+    if (vm is ViewModel) vm.onInit();
+    return vm;
   }
 
   @override
   void dispose() {
     for (final vm in _models.values) {
+      if (vm is ViewModel) vm.onDispose();
       if (vm is ChangeNotifier) vm.dispose();
     }
     _models.clear();

@@ -11,7 +11,12 @@ dependencies:
     sdk: flutter
   navhost_state:
     path: ../
+  navhost: ">=0.1.7"
   cupertino_icons: ^1.0.8
+
+dependency_overrides:
+  navhost:
+    path: ../../navhost
 
 dev_dependencies:
   flutter_test:

@@ -132,19 +132,19 @@ packages:
     source: hosted
     version: "1.17.0"
   navhost:
-    dependency: transitive
+    dependency: "direct main"
     description:
       path: "../../navhost"
       relative: true
     source: path
-    version: "0.1.2"
+    version: "0.1.7"
   navhost_state:
     dependency: "direct main"
     description:
       path: ".."
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.2.2"
   path:
     dependency: transitive
     description:

@@ -22,7 +22,9 @@
 /// ```
 library;
 
+export 'src/collection_extensions.dart';
 export 'src/rx.dart';
+export 'src/view_model.dart';
 export 'src/view_model_builder.dart';
 export 'src/view_model_store.dart'
     show ViewModelScope, ViewModelContextExtension, rxRoutes;

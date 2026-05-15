@@ -2,18 +2,35 @@
 
 Reactive state management for [navhost](https://github.com/mathias8dev/navhost).
 
-`navhost_state` brings GetX-style `.obs` reactive values and `Obs` auto-tracking widgets to Flutter, along with scoped ViewModel management tied to the widget lifecycle.
+`navhost_state` brings GetX-style `.obs` reactive values and `Obs` / `ObsBuilder` auto-tracking widgets to Flutter, along with optional scoped ViewModel management tied to the widget lifecycle.
 
-## Features
+## Table of contents
 
-- **`.obs` reactive values** — wrap any value in `Rx<T>` with `0.obs`, `'hello'.obs`, `false.obs`
-- **`Obs` auto-tracking widget** — rebuilds only when the `Rx` values read inside it change
-- **Fine-grained rebuilds** — each `Obs` tracks its own dependencies independently
-- **Scoped ViewModels** — `context.viewModel()` creates once, reuses across rebuilds, auto-cleans on unmount
-- **`ViewModelScope`** — ties ViewModel lifecycle to the widget tree
-- **`rxRoutes()`** — wraps all navhost routes with `ViewModelScope` automatically
-- **`ViewModelBuilder`** — convenience widget that creates + subscribes in one step
-- **`Listen`** — subscribes to an existing ViewModel without re-creating it
+- [Getting started](#getting-started)
+- [Core concepts](#core-concepts)
+- [Recommended pattern: state hoisting](#recommended-pattern-state-hoisting)
+- [Usage](#usage)
+  - [Reactive values with `.obs`](#reactive-values-with-obs)
+  - [`Obs` and `ObsBuilder`](#obs-and-obsbuilder)
+  - [`batch`](#batch)
+  - [`computed`](#computed)
+  - [`effect`](#effect)
+  - [Reactive collections](#reactive-collections)
+  - [`Rx.toStream` / `fromStream`](#rxtostream--fromstream)
+  - [`ViewModel` lifecycle](#viewmodel-lifecycle)
+  - [Collection extensions](#collection-extensions)
+  - [ViewModel with private `Rx`](#viewmodel-with-private-rx)
+  - [Complex state example](#complex-state-example)
+  - [Without navhost](#without-navhost)
+- [Alternative: scoped ViewModels](#alternative-scoped-viewmodels)
+  - [`rxRoutes` and `context.viewModel`](#rxroutes-and-contextviewmodel)
+  - [Manual `ViewModelScope`](#manual-viewmodelscope)
+  - [`ViewModelBuilder`](#viewmodelbuilder)
+  - [`Listen`](#listen)
+- [Integration with other libraries](#integration-with-other-libraries)
+- [Migrating from other state management libraries](#migrating-from-other-state-management-libraries)
+- [Example](#example)
+- [License](#license)
 
 ## Getting started
 
@@ -28,50 +45,381 @@ import 'package:navhost/navhost.dart';
 import 'package:navhost_state/navhost_state.dart';
 ```
 
+## Core concepts
+
+| Concept | Description |
+|---------|-------------|
+| `Rx<T>` | Reactive wrapper around a value. Reading `.value` inside `Obs` registers a dependency. |
+| `.obs` | Extension that wraps any value in `Rx<T>`: `0.obs`, `'hello'.obs`, `false.obs`. |
+| `Rx.update(fn)` | Updates value by applying a function to the current value. |
+| `computed(() => ...)` | Read-only `Rx` derived from other `Rx` values; updates automatically. |
+| `effect(() { })` | Runs a callback immediately and re-runs it when tracked `Rx` values change. |
+| `batch(() { })` | Defers all `Rx` notifications until the callback returns — one rebuild instead of many. |
+| `RxList<E>` | Reactive `List` — notifies on in-place mutations (`add`, `remove`, etc.). |
+| `RxMap<K,V>` | Reactive `Map` — notifies on in-place mutations (`[]=`, `remove`, etc.). |
+| `RxSet<E>` | Reactive `Set` — notifies on in-place mutations (`add`, `remove`, etc.). |
+| `Rx.toStream()` | Exposes an `Rx` as a `Stream` of future changes. |
+| `fromStream(stream, initial:)` | Creates an `Rx` that syncs from a `Stream`. |
+| `Obs` | Widget that rebuilds automatically when any `Rx` value read inside its builder changes. |
+| `ObsBuilder` | Same as `Obs`, but the builder receives a `BuildContext`. |
+| `ViewModel` | Base class with `onInit()` / `onDispose()` lifecycle hooks. |
+| `ViewModelScope` | Ties a ViewModel's lifecycle to the widget tree (alternative pattern). |
+| `rxRoutes()` | Wraps navhost routes with `ViewModelScope` automatically (alternative pattern). |
+
+## Recommended pattern: state hoisting
+
+The simplest and most testable approach: create the ViewModel in the route builder and pass it as a constructor parameter to the page. The page declares its dependencies explicitly — no implicit lookups, no scope infrastructure.
+
+```dart
+NavController(
+  routes: [
+    NavRoute('/counter', (_, _) => CounterPage(
+      viewModel: CounterViewModel(),   // created here, owned here
+    )),
+  ],
+)
+```
+
+The ViewModel is created once when the route is built and lives as long as the page widget. When the route is popped the ViewModel is garbage-collected — no explicit cleanup needed.
+
+**Why hoisting?**
+
+- Pages are just functions of their inputs — easy to test with a mock ViewModel
+- Dependencies are visible at the call site — no magic lookups inside the widget tree
+- Works with any DI system — resolve from get_it, pass in, done
+- No `ViewModelScope` or `rxRoutes()` required
+
+`ViewModelScope`, `rxRoutes()`, and `context.viewModel()` remain available for cases where hoisting isn't practical (deeply nested widgets, shared ViewModels across routes). See [Alternative: scoped ViewModels](#alternative-scoped-viewmodels).
+
 ## Usage
 
-### Reactive values with `.obs` and `Obs`
+### Reactive values with `.obs`
 
 ```dart
 final count = 0.obs;
 
-// Obs rebuilds automatically when count.value changes
+count.value = 5;  // triggers rebuild of any Obs reading it
+count.value = 5;  // no-op — same value, no rebuild
+```
+
+Any Dart type can be made reactive:
+
+```dart
+final name    = 'World'.obs;
+final visible = true.obs;
+final items   = Rx<List<String>>([]);
+final user    = Rx<User?>(null);
+```
+
+Use `update` to derive a new value from the current one:
+
+```dart
+count.update((prev) => prev + 1);
+items.update((prev) => [...prev, 'new item']);
+```
+
+`update` reads the current value without registering a tracking dependency, then assigns the result through the normal setter (equality-checked, notifies subscribers only on change).
+
+### `Obs` and `ObsBuilder`
+
+`Obs` takes a positional builder with no context:
+
+```dart
 Obs(() => Text('${count.value}'))
-
-// Only notifies when value actually changes
-count.value = 5;  // triggers rebuild
-count.value = 5;  // no-op — same value
 ```
 
-### Multiple `Obs` watching the same value
+`ObsBuilder` takes a named builder with `BuildContext` — use it when you need the theme, a navigator, or a dialog:
 
 ```dart
-final name = 'World'.obs;
-
-Column(children: [
-  Obs(() => Text('Hello, ${name.value}!')),   // rebuilds on change
-  Obs(() => Text('Length: ${name.value.length}')), // also rebuilds
-])
+ObsBuilder(
+  builder: (context) => Text(
+    '${count.value}',
+    style: Theme.of(context).textTheme.headlineMedium,
+  ),
+)
 ```
 
-Each `Obs` tracks only the `Rx` values it actually reads — unrelated changes don't cause rebuilds.
+Both track only the `Rx` values actually read during the build — unrelated changes don't cause a rebuild.
 
-### ViewModel with `.obs`
+### `batch`
 
-ViewModels don't need to extend `ChangeNotifier`. Plain classes work perfectly with `.obs` + `Obs`:
+Defer all notifications from multiple `Rx` changes and flush them together, causing a single rebuild instead of one per change:
 
 ```dart
-class CounterViewModel {
-  final count = 0.obs;
-  void increment() => count.value++;
+batch(() {
+  _firstName.value = 'Jane';
+  _lastName.value  = 'Doe';
+  _age.value       = 30;
+}); // one rebuild
+```
+
+Nested `batch` calls are safe — the flush happens only when the outermost batch returns.
+
+### `computed`
+
+A read-only `Rx` whose value is derived from other `Rx` values and updates automatically when any dependency changes:
+
+```dart
+final firstName = 'Jane'.obs;
+final lastName  = 'Doe'.obs;
+final fullName  = computed(() => '${firstName.value} ${lastName.value}');
+
+print(fullName.value); // Jane Doe
+firstName.value = 'John';
+print(fullName.value); // John Doe — updated automatically
+```
+
+Assigning to a `computed` throws `UnsupportedError`. Update its dependencies instead.
+
+### `effect`
+
+Runs a callback immediately and re-runs it whenever any `Rx` value read inside it changes. Returns an `Effect` handle — call `dispose()` to stop:
+
+```dart
+final name = 'Alice'.obs;
+
+final e = effect(() => print('Hello, ${name.value}'));
+// prints: Hello, Alice
+
+name.value = 'Bob';
+// prints: Hello, Bob
+
+e.dispose(); // stops reacting
+```
+
+### Reactive collections
+
+`RxList`, `RxMap`, and `RxSet` notify `Obs` on in-place mutations without requiring a full value reassignment:
+
+```dart
+final items  = RxList<String>();
+final scores = RxMap<String, int>();
+final tags   = RxSet<String>();
+
+items.add('hello');     // triggers rebuild
+scores['Alice'] = 10;   // triggers rebuild
+tags.add('flutter');    // triggers rebuild
+```
+
+Read via `.value` (returns an unmodifiable view) or the built-in query methods — all tracked:
+
+```dart
+Obs(() => Column(children: [
+  Text('${items.length} items'),
+  Text(items.sortedBy((e) => e).joinToString()),
+  Text(scores.filterValues((v) => v > 5).keys.join(', ')),
+]))
+```
+
+See [collection extensions](#collection-extensions) for the full query API.
+
+### `Rx.toStream` / `fromStream`
+
+Interop with stream-based APIs:
+
+```dart
+// Stream of future changes (does not emit current value on listen)
+final sub = count.toStream().listen(print);
+count.value = 1; // prints 1 synchronously
+
+// Rx backed by a Stream
+final rx = fromStream(priceStream, initial: 0.0);
+Obs(() => Text('${rx.value}'))
+```
+
+### `ViewModel` lifecycle
+
+Extend `ViewModel` to get `onInit` and `onDispose` hooks that fire automatically inside `ViewModelScope`:
+
+```dart
+class PostListViewModel extends ViewModel {
+  final _posts = RxList<Post>();
+  List<Post> get posts => _posts.value;
+
+  @override
+  void onInit() => loadPosts();
+
+  @override
+  void onDispose() => _subscription?.cancel();
 }
 ```
 
-`ViewModelBuilder` and `Listen` still require `ChangeNotifier` because they use `ListenableBuilder` internally. For plain class ViewModels, use `context.viewModel()` + `Obs` instead.
+Works with state hoisting (call manually) or with `rxRoutes()` / `ViewModelScope` (called automatically).
 
-### Scoped ViewModel with `rxRoutes`
+### Collection extensions
 
-`rxRoutes()` wraps each route with a `ViewModelScope`, so `context.viewModel()` just works:
+`navhost_state` exports Kotlin-inspired extensions on plain Dart collections (via `package:collection` + additions). These work on any `Iterable`, `List`, `Map` — not just `Rx` types:
+
+**`Iterable<E>`** — `singleOrNull`, `filterNot`, `groupBy`, `chunked`, `count`, `sumOf`, `minByOrNull`, `maxByOrNull`, `associateBy`, `associate`, `partition`, `distinctBy`, `flatMap`, `zip`, `joinToString`, `onEach`, `drop`, `dropWhile`
+
+**`List<E>`** — `sortedByDescending`, `indices` (plus `sortedBy`, `forEachIndexed`, `mapIndexed`, `whereNot`, `slices` from `package:collection`)
+
+**`Map<K,V>`** — `mapValues`, `mapKeys`, `filterKeys`, `filterValues`, `filter`, `getOrDefault`, `getOrElse`, `none`, `all`, `count`, `minByOrNull`, `maxByOrNull`, `toList`
+
+All query methods on `RxList`, `RxMap`, and `RxSet` are tracked — reading them inside `Obs` registers a dependency.
+
+### ViewModel with private `Rx`
+
+Keep `Rx` fields private and expose plain values through getters. Callers get a clean API with no `.value` noise, while `Obs` still tracks changes because the getter reads `.value` internally:
+
+```dart
+class CounterViewModel {
+  final _count = 0.obs;
+  int get count => _count.value;  // public value, private Rx
+
+  void increment() => _count.value++;
+  void reset()     => _count.value = 0;
+}
+```
+
+```dart
+class CounterPage extends StatelessWidget {
+  final CounterViewModel viewModel;
+  const CounterPage({super.key, required this.viewModel});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obs(() => Column(
+      children: [
+        Text('${viewModel.count}'),  // no .value at the call site
+        FilledButton(onPressed: viewModel.increment, child: const Text('+')),
+      ],
+    ));
+  }
+}
+```
+
+Mutation is only possible through the ViewModel's own methods — the `Rx` cannot be replaced or observed directly from outside.
+
+### Complex state example
+
+A realistic ViewModel with multiple reactive fields, async loading, error handling, and derived state:
+
+```dart
+class PostListViewModel {
+  final PostRepository _repo;
+  PostListViewModel(this._repo);
+
+  final _posts          = Rx<List<Post>>([]);
+  final _isLoadingPosts = false.obs;
+  final _postsError     = Rx<String?>(null);
+  final _searchQuery    = ''.obs;
+
+  List<Post>  get posts          => _posts.value;
+  bool        get isLoadingPosts => _isLoadingPosts.value;
+  String?     get postsError     => _postsError.value;
+  String      get searchQuery    => _searchQuery.value;
+
+  // Derived state — tracked by Obs because it reads reactive getters
+  List<Post> get filteredPosts => searchQuery.isEmpty
+      ? posts
+      : posts.where((p) => p.title.toLowerCase().contains(searchQuery.toLowerCase())).toList();
+  bool get isPostsEmpty => !isLoadingPosts && postsError == null && filteredPosts.isEmpty;
+
+  Future<void> loadPosts() async {
+    _isLoadingPosts.value = true;
+    _postsError.value = null;
+    try {
+      _posts.value = await _repo.fetchPosts();
+    } catch (e) {
+      _postsError.value = e.toString();
+    } finally {
+      _isLoadingPosts.value = false;
+    }
+  }
+
+  void searchPosts(String q) => _searchQuery.value = q;
+}
+```
+
+The page wraps its body in a single `Obs` — the standard approach when a ViewModel owns a whole page:
+
+```dart
+class PostListPage extends StatefulWidget {
+  final PostListViewModel viewModel;
+  const PostListPage({super.key, required this.viewModel});
+
+  @override
+  State<PostListPage> createState() => _PostListPageState();
+}
+
+class _PostListPageState extends State<PostListPage> {
+  @override
+  void initState() {
+    super.initState();
+    widget.viewModel.loadPosts();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = widget.viewModel;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Posts')),
+      body: Obs(() => Column(
+        children: [
+          TextField(
+            onChanged: vm.searchPosts,
+            decoration: InputDecoration(
+              hintText: 'Search...',
+              suffixIcon: vm.searchQuery.isNotEmpty
+                  ? IconButton(icon: const Icon(Icons.clear), onPressed: () => vm.searchPosts(''))
+                  : null,
+            ),
+          ),
+          Expanded(child: switch (true) {
+            _ when vm.isLoadingPosts  => const Center(child: CircularProgressIndicator()),
+            _ when vm.postsError != null => Center(child: Text(vm.postsError!)),
+            _ when vm.isPostsEmpty    => const Center(child: Text('No posts found.')),
+            _ => ListView.builder(
+                itemCount: vm.filteredPosts.length,
+                itemBuilder: (_, i) => ListTile(
+                  title: Text(vm.filteredPosts[i].title),
+                  subtitle: Text(vm.filteredPosts[i].body, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+              ),
+          }),
+        ],
+      )),
+    );
+  }
+}
+```
+
+Wired up via state hoisting:
+
+```dart
+NavRoute('/posts', (_, _) => PostListPage(
+  viewModel: PostListViewModel(getIt<PostRepository>()),
+)),
+```
+
+### Without navhost
+
+The reactive system works independently of navhost — use `.obs` and `Obs` in any widget:
+
+```dart
+class CounterPage extends StatefulWidget {
+  @override
+  State<CounterPage> createState() => _CounterPageState();
+}
+
+class _CounterPageState extends State<CounterPage> {
+  final _count = 0.obs;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obs(() => Text('${_count.value}'));
+  }
+}
+```
+
+## Alternative: scoped ViewModels
+
+When state hoisting isn't practical — deeply nested widgets, shared state across sibling routes — use the scoped ViewModel system instead.
+
+### `rxRoutes` and `context.viewModel`
+
+`rxRoutes()` wraps each route with a `ViewModelScope`, enabling `context.viewModel()`:
 
 ```dart
 final nav = NavController(
@@ -87,51 +435,40 @@ class CounterPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = context.viewModel(() => CounterViewModel());
-
     return Obs(() => Column(
       children: [
         Text('Count: ${vm.count.value}'),
-        FilledButton(
-          onPressed: vm.increment,
-          child: const Text('Increment'),
-        ),
+        FilledButton(onPressed: vm.increment, child: const Text('Increment')),
       ],
     ));
   }
 }
 ```
 
-The ViewModel is created once and reused across rebuilds. It is disposed when the route is removed from the navigation stack.
+The ViewModel is created once and reused across rebuilds. It is disposed when the route is removed from the stack.
 
 ### Manual `ViewModelScope`
 
-You can use `ViewModelScope` directly without `rxRoutes()`:
+Use `ViewModelScope` directly without `rxRoutes()`:
 
 ```dart
-NavRoute(
-  '/counter',
-  (_, _) => ViewModelScope(
-    child: CounterPage(),
-  ),
-)
+NavRoute('/counter', (_, _) => ViewModelScope(child: CounterPage()))
 ```
 
 ### `ViewModelBuilder`
 
-Creates a scoped ViewModel and subscribes to it in one widget:
+Creates a scoped ViewModel and subscribes to it in one widget. Requires `ChangeNotifier`:
 
 ```dart
 ViewModelBuilder<CounterViewModel>(
   factory: () => CounterViewModel(),
-  builder: (context, vm, child) => Obs(() =>
-    Text('Count: ${vm.count.value}'),
-  ),
+  builder: (context, vm, child) => Text('Count: ${vm.count}'),
 )
 ```
 
 ### `Listen`
 
-Subscribes to an existing ViewModel without re-creating it:
+Subscribes to an existing scoped ViewModel without re-creating it. Requires `ChangeNotifier`:
 
 ```dart
 Listen<CounterViewModel>(
@@ -139,103 +476,54 @@ Listen<CounterViewModel>(
 )
 ```
 
-### Without navhost — plain `StatefulWidget`
-
-The reactive system works independently of navhost. You can use `.obs` and `Obs` anywhere:
-
-```dart
-class CounterPage extends StatefulWidget {
-  @override
-  State<CounterPage> createState() => _CounterPageState();
-}
-
-class _CounterPageState extends State<CounterPage> {
-  final count = 0.obs;
-
-  @override
-  Widget build(BuildContext context) {
-    return Obs(() => Text('${count.value}'));
-  }
-}
-```
-
 ## Integration with other libraries
 
-`navhost_state` is unopinionated about dependency injection — the `context.viewModel()` factory is just a function, so it works naturally with any DI solution.
+`navhost_state` is unopinionated about dependency injection. The examples below use public `Rx` fields for brevity — in production code prefer private fields with public getters as shown in [ViewModel with private `Rx`](#viewmodel-with-private-rx).
 
 ### get_it
 
-Use [get_it](https://pub.dev/packages/get_it) to inject services into your ViewModels:
-
 ```dart
-// Register services
-final getIt = GetIt.instance;
-getIt.registerSingleton<ApiService>(ApiService());
-getIt.registerSingleton<AuthRepository>(AuthRepository());
-
-// ViewModel receives dependencies via get_it
 class UserViewModel {
-  final _api = GetIt.I<ApiService>();
+  final _api  = GetIt.I<ApiService>();
   final _auth = GetIt.I<AuthRepository>();
 
-  final user = Rx<User?>(null);
-  final loading = false.obs;
+  final _user    = Rx<User?>(null);
+  final _loading = false.obs;
+
+  User?  get user    => _user.value;
+  bool   get loading => _loading.value;
 
   Future<void> loadUser(String id) async {
-    loading.value = true;
-    user.value = await _api.fetchUser(id, token: _auth.token);
-    loading.value = false;
+    _loading.value = true;
+    _user.value = await _api.fetchUser(id, token: _auth.token);
+    _loading.value = false;
   }
 }
 
-// In your route
-final vm = context.viewModel(() => UserViewModel());
-return Obs(() => vm.loading.value
-    ? const CircularProgressIndicator()
-    : Text(vm.user.value?.name ?? 'No user'));
-```
-
-### injectable + get_it
-
-With [injectable](https://pub.dev/packages/injectable), use constructor injection for cleaner setup:
-
-```dart
-@injectable
-class OrderViewModel {
-  final OrderRepository _repo;
-  final orders = Rx<List<Order>>([]);
-
-  OrderViewModel(this._repo);
-
-  Future<void> load() async {
-    orders.value = await _repo.getAll();
-  }
-}
-
-// In your route — get_it resolves the constructor dependencies
-final vm = context.viewModel(() => getIt<OrderViewModel>());
-return Obs(() => ListView(
-  children: vm.orders.value.map((o) => Text(o.title)).toList(),
-));
+// Hoisted into the route
+NavRoute('/user/:id', (p, _) => UserPage(
+  viewModel: UserViewModel(),
+))
 ```
 
 ### dio
-
-Pair with [dio](https://pub.dev/packages/dio) for HTTP-driven state:
 
 ```dart
 class PostsViewModel {
   final _dio = Dio(BaseOptions(baseUrl: 'https://api.example.com'));
 
-  final posts = Rx<List<Post>>([]);
-  final error = Rx<String?>(null);
+  final _posts = Rx<List<Post>>([]);
+  final _error = Rx<String?>(null);
+
+  List<Post> get posts => _posts.value;
+  String?    get error => _error.value;
 
   Future<void> fetch() async {
     try {
       final response = await _dio.get('/posts');
-      posts.value = (response.data as List).map(Post.fromJson).toList();
+      _posts.value = (response.data as List).map(Post.fromJson).toList();
     } on DioException catch (e) {
-      error.value = e.message;
+      _error.value = e.message;
     }
   }
 }
@@ -243,316 +531,197 @@ class PostsViewModel {
 
 ### shared_preferences
 
-Persist and restore reactive state with [shared_preferences](https://pub.dev/packages/shared_preferences):
-
 ```dart
 class SettingsViewModel {
-  final darkMode = false.obs;
-  final locale = 'en'.obs;
+  final _darkMode = false.obs;
+  final _locale   = 'en'.obs;
+
+  bool   get darkMode => _darkMode.value;
+  String get locale   => _locale.value;
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    darkMode.value = prefs.getBool('darkMode') ?? false;
-    locale.value = prefs.getString('locale') ?? 'en';
+    _darkMode.value = prefs.getBool('darkMode') ?? false;
+    _locale.value   = prefs.getString('locale')  ?? 'en';
   }
 
   Future<void> toggleDarkMode() async {
-    darkMode.value = !darkMode.value;
+    _darkMode.value = !_darkMode.value;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('darkMode', darkMode.value);
-  }
-}
-```
-
-### freezed
-
-Use [freezed](https://pub.dev/packages/freezed) for immutable models with `copyWith` — a natural fit with `Rx`:
-
-```dart
-@freezed
-class UserProfile with _$UserProfile {
-  const factory UserProfile({
-    required String name,
-    required String email,
-    @Default(false) bool verified,
-  }) = _UserProfile;
-}
-
-class ProfileViewModel {
-  final profile = Rx<UserProfile?>(null);
-  final saving = false.obs;
-
-  void updateName(String name) {
-    profile.value = profile.value?.copyWith(name: name);
-  }
-
-  Future<void> save() async {
-    saving.value = true;
-    await api.updateProfile(profile.value!);
-    saving.value = false;
-  }
-}
-```
-
-### hive
-
-Local persistence with [hive](https://pub.dev/packages/hive):
-
-```dart
-class NotesViewModel {
-  final notes = Rx<List<Note>>([]);
-  late final Box<Note> _box;
-
-  Future<void> init() async {
-    _box = await Hive.openBox<Note>('notes');
-    notes.value = _box.values.toList();
-  }
-
-  Future<void> add(String text) async {
-    final note = Note(text: text, createdAt: DateTime.now());
-    await _box.add(note);
-    notes.value = _box.values.toList();
-  }
-
-  Future<void> delete(int index) async {
-    await _box.deleteAt(index);
-    notes.value = _box.values.toList();
-  }
-}
-```
-
-### firebase
-
-Firestore and Auth with [cloud_firestore](https://pub.dev/packages/cloud_firestore) and [firebase_auth](https://pub.dev/packages/firebase_auth):
-
-```dart
-class AuthViewModel {
-  final user = Rx<User?>(FirebaseAuth.instance.currentUser);
-
-  AuthViewModel() {
-    FirebaseAuth.instance.authStateChanges().listen((u) {
-      user.value = u;
-    });
-  }
-
-  Future<void> signIn(String email, String password) async {
-    await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-  }
-
-  Future<void> signOut() => FirebaseAuth.instance.signOut();
-}
-
-class ChatViewModel {
-  final messages = Rx<List<Message>>([]);
-
-  ChatViewModel(String chatId) {
-    FirebaseFirestore.instance
-        .collection('chats/$chatId/messages')
-        .orderBy('timestamp')
-        .snapshots()
-        .listen((snapshot) {
-      messages.value = snapshot.docs.map(Message.fromDoc).toList();
-    });
-  }
-}
-```
-
-### web_socket_channel
-
-Real-time data with [web_socket_channel](https://pub.dev/packages/web_socket_channel):
-
-```dart
-class LivePriceViewModel {
-  final price = 0.0.obs;
-  final connected = false.obs;
-  late final WebSocketChannel _channel;
-
-  void connect(String symbol) {
-    _channel = WebSocketChannel.connect(
-      Uri.parse('wss://stream.example.com/prices/$symbol'),
-    );
-    connected.value = true;
-
-    _channel.stream.listen(
-      (data) => price.value = double.parse(data),
-      onDone: () => connected.value = false,
-    );
-  }
-
-  void disconnect() {
-    _channel.sink.close();
-    connected.value = false;
+    await prefs.setBool('darkMode', _darkMode.value);
   }
 }
 ```
 
 ### flutter_secure_storage
 
-Secure token storage with [flutter_secure_storage](https://pub.dev/packages/flutter_secure_storage):
-
 ```dart
 class SessionViewModel {
   final _storage = const FlutterSecureStorage();
-  final isLoggedIn = false.obs;
-  final token = Rx<String?>(null);
+
+  final _isLoggedIn = false.obs;
+  final _token      = Rx<String?>(null);
+
+  bool    get isLoggedIn => _isLoggedIn.value;
+  String? get token      => _token.value;
 
   Future<void> restore() async {
-    token.value = await _storage.read(key: 'auth_token');
-    isLoggedIn.value = token.value != null;
+    _token.value      = await _storage.read(key: 'auth_token');
+    _isLoggedIn.value = _token.value != null;
   }
 
   Future<void> login(String newToken) async {
     await _storage.write(key: 'auth_token', value: newToken);
-    token.value = newToken;
-    isLoggedIn.value = true;
+    _token.value      = newToken;
+    _isLoggedIn.value = true;
   }
 
   Future<void> logout() async {
     await _storage.delete(key: 'auth_token');
-    token.value = null;
-    isLoggedIn.value = false;
+    _token.value      = null;
+    _isLoggedIn.value = false;
+  }
+}
+```
+
+### firebase
+
+```dart
+class AuthViewModel {
+  final _user = Rx<User?>(FirebaseAuth.instance.currentUser);
+  User? get user => _user.value;
+
+  AuthViewModel() {
+    FirebaseAuth.instance.authStateChanges().listen((u) => _user.value = u);
+  }
+
+  Future<void> signIn(String email, String password) =>
+      FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
+
+  Future<void> signOut() => FirebaseAuth.instance.signOut();
+}
+```
+
+### freezed
+
+```dart
+class ProfileViewModel {
+  final _profile = Rx<UserProfile?>(null);
+  final _saving  = false.obs;
+
+  UserProfile? get profile => _profile.value;
+  bool         get saving  => _saving.value;
+
+  void updateName(String name) =>
+      _profile.value = _profile.value?.copyWith(name: name);
+
+  Future<void> save() async {
+    _saving.value = true;
+    await api.updateProfile(_profile.value!);
+    _saving.value = false;
   }
 }
 ```
 
 ## Migrating from other state management libraries
 
-If you're adopting navhost for navigation, you can migrate your state management incrementally — old and new screens coexist without conflict.
+All approaches coexist in the same widget tree — migrate one screen at a time.
 
 ### From Provider / ChangeNotifierProvider
 
-**Before:**
 ```dart
+// Before
 class CounterModel extends ChangeNotifier {
   int _count = 0;
   int get count => _count;
-  void increment() {
-    _count++;
-    notifyListeners();
-  }
+  void increment() { _count++; notifyListeners(); }
 }
-
-// Provided at the top of the tree
 ChangeNotifierProvider(
   create: (_) => CounterModel(),
   child: Consumer<CounterModel>(
     builder: (context, model, _) => Text('${model.count}'),
   ),
 )
-```
 
-**After:**
-```dart
+// After
 class CounterViewModel {
-  final count = 0.obs;
-  void increment() => count.value++;
+  final _count = 0.obs;
+  int get count => _count.value;
+  void increment() => _count.value++;
 }
-
-// Scoped to the route automatically via rxRoutes
-final vm = context.viewModel(() => CounterViewModel());
-return Obs(() => Text('${vm.count.value}'));
+// Hoisted into the route — no Provider needed
+NavRoute('/', (_, _) => CounterPage(viewModel: CounterViewModel()))
 ```
-
-**During migration** — existing Provider screens keep working. New screens use `context.viewModel()` + `Obs`. No need to touch the `MultiProvider` setup until you're ready.
 
 ### From Riverpod
 
-**Before:**
 ```dart
+// Before
 final counterProvider = StateNotifierProvider<CounterNotifier, int>(
   (ref) => CounterNotifier(),
 );
-
-class CounterNotifier extends StateNotifier<int> {
-  CounterNotifier() : super(0);
-  void increment() => state++;
-}
-
 // In a ConsumerWidget
 final count = ref.watch(counterProvider);
 return Text('$count');
-```
 
-**After:**
-```dart
+// After
 class CounterViewModel {
-  final count = 0.obs;
-  void increment() => count.value++;
+  final _count = 0.obs;
+  int get count => _count.value;
+  void increment() => _count.value++;
 }
-
-final vm = context.viewModel(() => CounterViewModel());
-return Obs(() => Text('${vm.count.value}'));
+NavRoute('/', (_, _) => CounterPage(viewModel: CounterViewModel()))
 ```
 
-**During migration** — `ProviderScope` and `ViewModelScope` are independent. Screens using `ref.watch` and screens using `Obs` can coexist in the same app. Migrate one screen at a time.
+`ProviderScope` and navhost_state coexist — screens using `ref.watch` and screens using `Obs` can live in the same app.
 
 ### From GetX
 
-**Before:**
 ```dart
+// Before
 class CounterController extends GetxController {
   final count = 0.obs;
   void increment() => count++;
 }
-
-// Global binding
 Get.put(CounterController());
-final ctrl = Get.find<CounterController>();
-return Obx(() => Text('${ctrl.count}'));
-```
+return Obx(() => Text('${Get.find<CounterController>().count}'));
 
-**After:**
-```dart
+// After
 class CounterViewModel {
-  final count = 0.obs;
-  void increment() => count.value++;
+  final _count = 0.obs;
+  int get count => _count.value;
+  void increment() => _count.value++;
 }
-
-final vm = context.viewModel(() => CounterViewModel());
-return Obs(() => Text('${vm.count.value}'));
+NavRoute('/', (_, _) => CounterPage(viewModel: CounterViewModel()))
 ```
 
-The API is intentionally similar. Key differences: ViewModels are **scoped to the route** (not global), and you use `.value` explicitly instead of operator overloading. No `Get.put` / `Get.find` — the widget tree owns the lifecycle.
+Key differences from GetX: ViewModels are scoped to the route (not global), `.value` is explicit, and there is no `Get.put` / `Get.find`.
 
 ### From Bloc / Cubit
 
-**Before:**
 ```dart
+// Before
 class CounterCubit extends Cubit<int> {
   CounterCubit() : super(0);
   void increment() => emit(state + 1);
 }
-
 BlocProvider(
   create: (_) => CounterCubit(),
   child: BlocBuilder<CounterCubit, int>(
     builder: (context, count) => Text('$count'),
   ),
 )
-```
 
-**After:**
-```dart
+// After
 class CounterViewModel {
-  final count = 0.obs;
-  void increment() => count.value++;
+  final _count = 0.obs;
+  int get count => _count.value;
+  void increment() => _count.value++;
 }
-
-final vm = context.viewModel(() => CounterViewModel());
-return Obs(() => Text('${vm.count.value}'));
+NavRoute('/', (_, _) => CounterPage(viewModel: CounterViewModel()))
 ```
 
-**During migration** — `BlocProvider` and `ViewModelScope` don't interfere. You can wrap new navhost routes with `rxRoutes()` while existing routes keep their `BlocProvider` wrappers.
-
-### Migration tips
-
-- **Migrate one screen at a time** — all approaches coexist in the same widget tree
-- **Start with new screens** — use `context.viewModel()` + `Obs` for new routes, leave existing ones untouched
-- **Move shared services last** — keep your repositories and API clients in get_it or Provider; only migrate the UI-facing state
-- **Remove old providers** once no screen references them — the compiler will tell you when
+`BlocProvider` and navhost_state don't interfere — existing routes keep their `BlocProvider` wrappers while new routes use hoisting.
 
 ## Example
 
