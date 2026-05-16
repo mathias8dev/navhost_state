@@ -1,3 +1,11 @@
+## 0.2.3
+
+- README: expand "Recommended pattern: state hoisting" section with a full explanation of the philosophy — unidirectional data flow, data-down/events-up diagram, and five concrete justifications (testability, explicit dependencies, framework-agnostic VMs, predictable lifetime, DI-friendly).
+- README: add code examples to the collection extensions section so readers can see what each category of method does at a glance.
+- README: clarify `ViewModel` lifecycle section — add `initState` / `dispose` snippet showing how to call `onInit` / `onDispose` manually when using state hoisting.
+- README: fix `rxRoutes` example to use the recommended private-field pattern (`vm.count` instead of `vm.count.value`).
+- README: fix incorrect integration disclaimer that claimed examples used public `Rx` fields (they already followed the private-field pattern).
+
 ## 0.2.2
 
 - Add explicit dependency on `package:collection` (already a Flutter transitive dep).

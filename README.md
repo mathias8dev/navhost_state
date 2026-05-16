@@ -68,28 +68,61 @@ import 'package:navhost_state/navhost_state.dart';
 
 ## Recommended pattern: state hoisting
 
-The simplest and most testable approach: create the ViewModel in the route builder and pass it as a constructor parameter to the page. The page declares its dependencies explicitly — no implicit lookups, no scope infrastructure.
+**State hoisting** is the idea that a widget should not own its own state — it should receive state from above and report events back up. The widget becomes a pure function of its inputs: given the same ViewModel, it always produces the same UI. State lives at the route boundary, not inside the widget tree.
+
+In practice: create the ViewModel in the route builder, pass it as a constructor parameter, and let the page read from it and call its methods. Nothing is looked up implicitly.
 
 ```dart
+// State lives here — at the route boundary
 NavController(
   routes: [
     NavRoute('/counter', (_, _) => CounterPage(
-      viewModel: CounterViewModel(),   // created here, owned here
+      viewModel: CounterViewModel(),
     )),
   ],
 )
+
+// Page receives state — it owns nothing
+class CounterPage extends StatelessWidget {
+  final CounterViewModel viewModel;
+  const CounterPage({super.key, required this.viewModel});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obs(() => Column(
+      children: [
+        Text('${viewModel.count}'),                           // reads state
+        FilledButton(
+          onPressed: viewModel.increment,                    // reports event up
+          child: const Text('+'),
+        ),
+      ],
+    ));
+  }
+}
 ```
 
-The ViewModel is created once when the route is built and lives as long as the page widget. When the route is popped the ViewModel is garbage-collected — no explicit cleanup needed.
+Data flows in one direction: **state down, events up**. The ViewModel holds state and exposes it through getters. The page reads those getters and calls methods in response to user actions. Neither side knows how the other works internally.
 
-**Why hoisting?**
+```
+Route builder
+  └── creates CounterViewModel          ← state lives here
+        └── passes to CounterPage
+              ├── reads viewModel.count  ← state flows down
+              └── calls viewModel.increment  ← events flow up
+```
 
-- Pages are just functions of their inputs — easy to test with a mock ViewModel
-- Dependencies are visible at the call site — no magic lookups inside the widget tree
-- Works with any DI system — resolve from get_it, pass in, done
-- No `ViewModelScope` or `rxRoutes()` required
+The ViewModel is created once when the route is built and garbage-collected when the route is popped — no explicit lifecycle management needed.
 
-`ViewModelScope`, `rxRoutes()`, and `context.viewModel()` remain available for cases where hoisting isn't practical (deeply nested widgets, shared ViewModels across routes). See [Alternative: scoped ViewModels](#alternative-scoped-viewmodels).
+**Why this approach?**
+
+- **Testable by construction.** To test a page, instantiate it with a mock or stub ViewModel — no widget tree setup, no `InheritedWidget` wiring, no `ProviderScope`. The page is just a function of its input.
+- **Explicit dependencies.** Everything the page needs is visible at the call site. There are no implicit lookups (`context.read`, `Get.find`, `context.viewModel`) that require the caller to know what the widget will search for at runtime.
+- **Framework-agnostic state.** The ViewModel is a plain Dart class — no `BuildContext`, no `Widget`. Business logic stays pure and can be tested without Flutter.
+- **Predictable lifetime.** The ViewModel's lifetime mirrors the route's lifetime exactly. No stale state across navigation, no manual disposal.
+- **DI-friendly.** Resolve dependencies from `get_it` (or any container) in the route builder, pass them in, done. The page never touches the DI layer.
+
+`ViewModelScope`, `rxRoutes()`, and `context.viewModel()` remain available for cases where hoisting isn't practical (deeply nested widgets, shared ViewModels across sibling routes). See [Alternative: scoped ViewModels](#alternative-scoped-viewmodels).
 
 ## Usage
 
@@ -244,11 +277,56 @@ class PostListViewModel extends ViewModel {
 }
 ```
 
-Works with state hoisting (call manually) or with `rxRoutes()` / `ViewModelScope` (called automatically).
+With `rxRoutes()` / `ViewModelScope`, `onInit` and `onDispose` are called automatically. With state hoisting, call them yourself:
+
+```dart
+class _PostListPageState extends State<PostListPage> {
+  @override
+  void initState() {
+    super.initState();
+    widget.viewModel.onInit();
+  }
+
+  @override
+  void dispose() {
+    widget.viewModel.onDispose();
+    super.dispose();
+  }
+  // ...
+}
+```
 
 ### Collection extensions
 
-`navhost_state` exports Kotlin-inspired extensions on plain Dart collections (via `package:collection` + additions). These work on any `Iterable`, `List`, `Map` — not just `Rx` types:
+`navhost_state` exports Kotlin-inspired collection extensions on plain Dart collections, built on top of `package:collection`. They work on any `Iterable`, `List`, or `Map` — not just `Rx` types:
+
+```dart
+final numbers = [3, 1, 4, 1, 5, 9, 2, 6];
+
+// Filtering
+numbers.filterNot((n) => n > 5);                   // [3, 1, 4, 1, 2]
+numbers.singleOrNull((n) => n == 9);               // 9
+numbers.count((n) => n.isOdd);                     // 5
+numbers.distinctBy((n) => n);                      // [3, 1, 4, 5, 9, 2, 6]
+
+// Grouping and slicing
+numbers.groupBy((n) => n.isOdd ? 'odd' : 'even'); // {odd: [3,1,1,5,9], even: [4,2,6]}
+numbers.chunked(3);                                // [[3,1,4], [1,5,9], [2,6]]
+numbers.partition((n) => n > 4);                   // ([5, 9, 6], [3, 1, 4, 1, 2])
+
+// Aggregation
+numbers.sumOf((n) => n);                           // 31
+numbers.minByOrNull((n) => n);                     // 1
+numbers.maxByOrNull((n) => n);                     // 9
+
+// Transformation
+numbers.flatMap((n) => [n, n * 2]);               // [3, 6, 1, 2, 4, 8, ...]
+numbers.joinToString(separator: ', ');             // '3, 1, 4, 1, 5, 9, 2, 6'
+numbers.drop(3);                                   // [1, 5, 9, 2, 6]
+
+// Association
+numbers.associateBy((n) => 'key_$n');             // {'key_3': 3, 'key_1': 1, ...}
+```
 
 **`Iterable<E>`** — `singleOrNull`, `filterNot`, `groupBy`, `chunked`, `count`, `sumOf`, `minByOrNull`, `maxByOrNull`, `associateBy`, `associate`, `partition`, `distinctBy`, `flatMap`, `zip`, `joinToString`, `onEach`, `drop`, `dropWhile`
 
@@ -431,13 +509,19 @@ final nav = NavController(
 ```
 
 ```dart
+class CounterViewModel {
+  final _count = 0.obs;
+  int get count => _count.value;
+  void increment() => _count.value++;
+}
+
 class CounterPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = context.viewModel(() => CounterViewModel());
     return Obs(() => Column(
       children: [
-        Text('Count: ${vm.count.value}'),
+        Text('Count: ${vm.count}'),
         FilledButton(onPressed: vm.increment, child: const Text('Increment')),
       ],
     ));
@@ -478,7 +562,7 @@ Listen<CounterViewModel>(
 
 ## Integration with other libraries
 
-`navhost_state` is unopinionated about dependency injection. The examples below use public `Rx` fields for brevity — in production code prefer private fields with public getters as shown in [ViewModel with private `Rx`](#viewmodel-with-private-rx).
+`navhost_state` is unopinionated about dependency injection. The examples below follow the recommended pattern of private `Rx` fields with public getters.
 
 ### get_it
 

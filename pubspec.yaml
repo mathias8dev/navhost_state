@@ -1,6 +1,6 @@
 name: navhost_state
 description: Reactive state management extensions for navhost — .obs values, Obs auto-tracking widget, ViewModelBuilder, and Listen.
-version: 0.2.2
+version: 0.2.3
 homepage: https://github.com/mathias8dev/navhost_state
 repository: https://github.com/mathias8dev/navhost_state
 
