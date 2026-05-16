@@ -49,7 +49,7 @@ extension IterableExtensions<E> on Iterable<E> {
   }
 
   /// Element whose [selector] value is the smallest, or `null` if empty.
-  E? minByOrNull<C extends Comparable<C>>(C Function(E) selector) {
+  E? minByOrNull<C extends Comparable<dynamic>>(C Function(E) selector) {
     E? result;
     C? min;
     for (final e in this) {
@@ -63,7 +63,7 @@ extension IterableExtensions<E> on Iterable<E> {
   }
 
   /// Element whose [selector] value is the largest, or `null` if empty.
-  E? maxByOrNull<C extends Comparable<C>>(C Function(E) selector) {
+  E? maxByOrNull<C extends Comparable<dynamic>>(C Function(E) selector) {
     E? result;
     C? max;
     for (final e in this) {
@@ -139,7 +139,7 @@ extension IterableExtensions<E> on Iterable<E> {
 extension ListExtensions<E> on List<E> {
   /// Returns a new list sorted descending by [selector].
   /// (Ascending [sortedBy] is provided by `package:collection`.)
-  List<E> sortedByDescending<C extends Comparable<C>>(C Function(E) selector) =>
+  List<E> sortedByDescending<C extends Comparable<dynamic>>(C Function(E) selector) =>
       [...this]..sort((a, b) => selector(b).compareTo(selector(a)));
 
   /// Valid indices of this list (0..length-1).
@@ -194,7 +194,7 @@ extension MapExtensions<K, V> on Map<K, V> {
   }
 
   /// Entry whose [selector] value is the smallest, or `null` if empty.
-  MapEntry<K, V>? minByOrNull<C extends Comparable<C>>(
+  MapEntry<K, V>? minByOrNull<C extends Comparable<dynamic>>(
       C Function(K key, V value) selector) {
     MapEntry<K, V>? result;
     C? min;
@@ -209,7 +209,7 @@ extension MapExtensions<K, V> on Map<K, V> {
   }
 
   /// Entry whose [selector] value is the largest, or `null` if empty.
-  MapEntry<K, V>? maxByOrNull<C extends Comparable<C>>(
+  MapEntry<K, V>? maxByOrNull<C extends Comparable<dynamic>>(
       C Function(K key, V value) selector) {
     MapEntry<K, V>? result;
     C? max;

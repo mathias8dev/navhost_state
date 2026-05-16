@@ -238,8 +238,8 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: [
-          NavRoute('/', (_, _) => Obs(() => Text('home:${shared.value}'))),
-          NavRoute('/other', (_, _) => Obs(() => Text('other:${shared.value}'))),
+          NavRoute('/', (p, q) => Obs(() => Text('home:${shared.value}'))),
+          NavRoute('/other', (p, q) => Obs(() => Text('other:${shared.value}'))),
         ],
       );
 

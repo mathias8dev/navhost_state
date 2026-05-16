@@ -12,7 +12,7 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_, _) => Builder(builder: (context) {
+          NavRoute('/', (p, q) => Builder(builder: (context) {
                 context.viewModel(() => LifecycleViewModel());
                 return const Text('Home');
               })),
@@ -30,8 +30,8 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_, _) => const Text('Home')),
-          NavRoute('/detail', (_, _) => Builder(builder: (context) {
+          NavRoute('/', (p, q) => const Text('Home')),
+          NavRoute('/detail', (p, q) => Builder(builder: (context) {
                 context.viewModel(() => LifecycleViewModel());
                 return const Text('Detail');
               })),
@@ -59,11 +59,11 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_, _) => Builder(builder: (context) {
+          NavRoute('/', (p, q) => Builder(builder: (context) {
                 final vm = context.viewModel(() => TestViewModel());
                 return Text('count:${vm.count}');
               })),
-          NavRoute('/b', (_, _) => const Text('B')),
+          NavRoute('/b', (p, q) => const Text('B')),
         ]),
       );
       TestViewModel.reset();
@@ -81,8 +81,8 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_, _) => const Text('Home')),
-          NavRoute('/detail', (_, _) => Builder(builder: (context) {
+          NavRoute('/', (p, q) => const Text('Home')),
+          NavRoute('/detail', (p, q) => Builder(builder: (context) {
                 final vm = context.viewModel(() => TestViewModel());
                 return Text('count:${vm.count}');
               })),
@@ -107,15 +107,15 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_, _) => Builder(builder: (context) {
+          NavRoute('/', (p, q) => Builder(builder: (context) {
                 context.viewModel(() => TestViewModel());
                 return const Text('Home');
               })),
-          NavRoute('/a', (_, _) => Builder(builder: (context) {
+          NavRoute('/a', (p, q) => Builder(builder: (context) {
                 context.viewModel(() => TestViewModel());
                 return const Text('A');
               })),
-          NavRoute('/b', (_, _) => const Text('B')),
+          NavRoute('/b', (p, q) => const Text('B')),
         ]),
       );
       TestViewModel.reset();
@@ -137,11 +137,11 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_, _) => Builder(builder: (context) {
+          NavRoute('/', (p, q) => Builder(builder: (context) {
                 homeVm = context.viewModel(() => TestViewModel());
                 return const Text('Home');
               })),
-          NavRoute('/detail', (_, _) => Builder(builder: (context) {
+          NavRoute('/detail', (p, q) => Builder(builder: (context) {
                 detailVm = context.viewModel(() => TestViewModel());
                 return const Text('Detail');
               })),
@@ -162,16 +162,16 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_, _) => const Text('Home')),
-          NavRoute('/a', (_, _) => Builder(builder: (context) {
+          NavRoute('/', (p, q) => const Text('Home')),
+          NavRoute('/a', (p, q) => Builder(builder: (context) {
                 context.viewModel(() => TestViewModel());
                 return const Text('A');
               })),
-          NavRoute('/b', (_, _) => Builder(builder: (context) {
+          NavRoute('/b', (p, q) => Builder(builder: (context) {
                 context.viewModel(() => TestViewModel());
                 return const Text('B');
               })),
-          NavRoute('/c', (_, _) => Builder(builder: (context) {
+          NavRoute('/c', (p, q) => Builder(builder: (context) {
                 context.viewModel(() => TestViewModel());
                 return const Text('C');
               })),
@@ -197,7 +197,7 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_, _) => ViewModelBuilder<TestViewModel>(
+          NavRoute('/', (p, q) => ViewModelBuilder<TestViewModel>(
                 factory: () => TestViewModel(),
                 builder: (context, vm, child) => Column(children: [
                   Text('count:${vm.count}'),
@@ -220,7 +220,7 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: [
-          NavRoute('/', (_, _) => ViewModelScope(
+          NavRoute('/', (p, q) => ViewModelScope(
                 child: Builder(builder: (context) {
                   final vm = context.viewModel(() => TestViewModel());
                   return Text('count:${vm.count}');
@@ -241,7 +241,7 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_, _) => Builder(builder: (context) {
+          NavRoute('/', (p, q) => Builder(builder: (context) {
                 final vm = context.viewModel(() => PlainViewModel());
                 return Obs(() => Text('count:${vm.count.value}'));
               })),
@@ -262,7 +262,7 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_, _) => Builder(builder: (context) {
+          NavRoute('/', (p, q) => Builder(builder: (context) {
                 final vm = context.viewModel(() => PlainViewModel());
                 return Obs(() => Text('count:${vm.count.value}'));
               })),
@@ -282,8 +282,8 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_, _) => const Text('Home')),
-          NavRoute('/detail', (_, _) => Builder(builder: (context) {
+          NavRoute('/', (p, q) => const Text('Home')),
+          NavRoute('/detail', (p, q) => Builder(builder: (context) {
                 context.viewModel(() => PlainViewModel());
                 return const Text('Detail');
               })),
@@ -308,7 +308,7 @@ void main() {
       final nav = NavController(
         initialRoute: '/',
         routes: rxRoutes([
-          NavRoute('/', (_, _) => Builder(builder: (context) {
+          NavRoute('/', (p, q) => Builder(builder: (context) {
                 final vm = context.viewModel(() => CounterViewModel());
                 return Obs(() => Text('count:${vm.count.value}'));
               })),

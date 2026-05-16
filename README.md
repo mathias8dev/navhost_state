@@ -8,7 +8,6 @@ Reactive state management for [navhost](https://github.com/mathias8dev/navhost).
 
 - [Getting started](#getting-started)
 - [Core concepts](#core-concepts)
-- [Recommended pattern: state hoisting](#recommended-pattern-state-hoisting)
 - [Usage](#usage)
   - [Reactive values with `.obs`](#reactive-values-with-obs)
   - [`Obs` and `ObsBuilder`](#obs-and-obsbuilder)
@@ -22,6 +21,7 @@ Reactive state management for [navhost](https://github.com/mathias8dev/navhost).
   - [ViewModel with private `Rx`](#viewmodel-with-private-rx)
   - [Complex state example](#complex-state-example)
   - [Without navhost](#without-navhost)
+- [Recommended pattern: state hoisting](#recommended-pattern-state-hoisting)
 - [Alternative: scoped ViewModels](#alternative-scoped-viewmodels)
   - [`rxRoutes` and `context.viewModel`](#rxroutes-and-contextviewmodel)
   - [Manual `ViewModelScope`](#manual-viewmodelscope)
@@ -65,64 +65,6 @@ import 'package:navhost_state/navhost_state.dart';
 | `ViewModel` | Base class with `onInit()` / `onDispose()` lifecycle hooks. |
 | `ViewModelScope` | Ties a ViewModel's lifecycle to the widget tree (alternative pattern). |
 | `rxRoutes()` | Wraps navhost routes with `ViewModelScope` automatically (alternative pattern). |
-
-## Recommended pattern: state hoisting
-
-**State hoisting** is the idea that a widget should not own its own state — it should receive state from above and report events back up. The widget becomes a pure function of its inputs: given the same ViewModel, it always produces the same UI. State lives at the route boundary, not inside the widget tree.
-
-In practice: create the ViewModel in the route builder, pass it as a constructor parameter, and let the page read from it and call its methods. Nothing is looked up implicitly.
-
-```dart
-// State lives here — at the route boundary
-NavController(
-  routes: [
-    NavRoute('/counter', (_, _) => CounterPage(
-      viewModel: CounterViewModel(),
-    )),
-  ],
-)
-
-// Page receives state — it owns nothing
-class CounterPage extends StatelessWidget {
-  final CounterViewModel viewModel;
-  const CounterPage({super.key, required this.viewModel});
-
-  @override
-  Widget build(BuildContext context) {
-    return Obs(() => Column(
-      children: [
-        Text('${viewModel.count}'),                           // reads state
-        FilledButton(
-          onPressed: viewModel.increment,                    // reports event up
-          child: const Text('+'),
-        ),
-      ],
-    ));
-  }
-}
-```
-
-Data flows in one direction: **state down, events up**. The ViewModel holds state and exposes it through getters. The page reads those getters and calls methods in response to user actions. Neither side knows how the other works internally.
-
-```
-Route builder
-  └── creates CounterViewModel          ← state lives here
-        └── passes to CounterPage
-              ├── reads viewModel.count  ← state flows down
-              └── calls viewModel.increment  ← events flow up
-```
-
-The ViewModel is created once when the route is built and garbage-collected when the route is popped — no explicit lifecycle management needed.
-
-**Why this approach?**
-
-- **Testable by construction.** To test a page, instantiate it with a mock or stub ViewModel — no widget tree setup, no `InheritedWidget` wiring, no `ProviderScope`. The page is just a function of its input.
-- **Explicit dependencies.** Everything the page needs is visible at the call site. There are no implicit lookups (`context.read`, `Get.find`, `context.viewModel`) that require the caller to know what the widget will search for at runtime.
-- **Framework-agnostic state.** The ViewModel is a plain Dart class — no `BuildContext`, no `Widget`. Business logic stays pure and can be tested without Flutter.
-- **Predictable lifetime.** The ViewModel's lifetime mirrors the route's lifetime exactly. No stale state across navigation, no manual disposal.
-- **DI-friendly.** Resolve dependencies from `get_it` (or any container) in the route builder, pass them in, done. The page never touches the DI layer.
-
-`ViewModelScope`, `rxRoutes()`, and `context.viewModel()` remain available for cases where hoisting isn't practical (deeply nested widgets, shared ViewModels across sibling routes). See [Alternative: scoped ViewModels](#alternative-scoped-viewmodels).
 
 ## Usage
 
@@ -490,6 +432,64 @@ class _CounterPageState extends State<CounterPage> {
   }
 }
 ```
+
+## Recommended pattern: state hoisting
+
+**State hoisting** is the idea that a widget should not own its own state — it should receive state from above and report events back up. The widget becomes a pure function of its inputs: given the same ViewModel, it always produces the same UI. State lives at the route boundary, not inside the widget tree.
+
+In practice: create the ViewModel in the route builder, pass it as a constructor parameter, and let the page read from it and call its methods. Nothing is looked up implicitly.
+
+```dart
+// State lives here — at the route boundary
+NavController(
+  routes: [
+    NavRoute('/counter', (_, _) => CounterPage(
+      viewModel: CounterViewModel(),
+    )),
+  ],
+)
+
+// Page receives state — it owns nothing
+class CounterPage extends StatelessWidget {
+  final CounterViewModel viewModel;
+  const CounterPage({super.key, required this.viewModel});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obs(() => Column(
+      children: [
+        Text('${viewModel.count}'),                           // reads state
+        FilledButton(
+          onPressed: viewModel.increment,                    // reports event up
+          child: const Text('+'),
+        ),
+      ],
+    ));
+  }
+}
+```
+
+Data flows in one direction: **state down, events up**. The ViewModel holds state and exposes it through getters. The page reads those getters and calls methods in response to user actions. Neither side knows how the other works internally.
+
+```
+Route builder
+  └── creates CounterViewModel          ← state lives here
+        └── passes to CounterPage
+              ├── reads viewModel.count  ← state flows down
+              └── calls viewModel.increment  ← events flow up
+```
+
+The ViewModel is created once when the route is built and garbage-collected when the route is popped — no explicit lifecycle management needed.
+
+**Why this approach?**
+
+- **Testable by construction.** To test a page, instantiate it with a mock or stub ViewModel — no widget tree setup, no `InheritedWidget` wiring, no `ProviderScope`. The page is just a function of its input.
+- **Explicit dependencies.** Everything the page needs is visible at the call site. There are no implicit lookups (`context.read`, `Get.find`, `context.viewModel`) that require the caller to know what the widget will search for at runtime.
+- **Framework-agnostic state.** The ViewModel is a plain Dart class — no `BuildContext`, no `Widget`. Business logic stays pure and can be tested without Flutter.
+- **Predictable lifetime.** The ViewModel's lifetime mirrors the route's lifetime exactly. No stale state across navigation, no manual disposal.
+- **DI-friendly.** Resolve dependencies from `get_it` (or any container) in the route builder, pass them in, done. The page never touches the DI layer.
+
+`ViewModelScope`, `rxRoutes()`, and `context.viewModel()` remain available for cases where hoisting isn't practical (deeply nested widgets, shared ViewModels across sibling routes). See [Alternative: scoped ViewModels](#alternative-scoped-viewmodels).
 
 ## Alternative: scoped ViewModels
 

@@ -137,14 +137,14 @@ packages:
       path: "../../navhost"
       relative: true
     source: path
-    version: "0.1.7"
+    version: "0.1.11"
   navhost_state:
     dependency: "direct main"
     description:
       path: ".."
       relative: true
     source: path
-    version: "0.2.2"
+    version: "0.2.4"
   path:
     dependency: transitive
     description:

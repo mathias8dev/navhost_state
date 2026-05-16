@@ -1,3 +1,10 @@
+## 0.2.4
+
+- Broaden Dart SDK constraint from `^3.11.3` to `">=3.0.0"` for compatibility with a wider range of Flutter versions.
+- Fix `Comparable<C>` bound on `minByOrNull`, `maxByOrNull`, and `sortedByDescending` — loosened to `Comparable<dynamic>` so `int` (which implements `Comparable<num>`) satisfies the bound at language version 3.0.
+- Fix `(_, _)` wildcard parameter usage in tests — renamed to `(_p, _q)` for compatibility with Dart language versions below 3.7.
+- README: reorder sections — Usage now appears before Recommended pattern so readers see the API before the structural guidance.
+
 ## 0.2.3
 
 - README: expand "Recommended pattern: state hoisting" section with a full explanation of the philosophy — unidirectional data flow, data-down/events-up diagram, and five concrete justifications (testability, explicit dependencies, framework-agnostic VMs, predictable lifetime, DI-friendly).

@@ -1,18 +1,18 @@
 name: navhost_state
 description: Reactive state management extensions for navhost — .obs values, Obs auto-tracking widget, ViewModelBuilder, and Listen.
-version: 0.2.3
+version: 0.2.4
 homepage: https://github.com/mathias8dev/navhost_state
 repository: https://github.com/mathias8dev/navhost_state
 
 environment:
-  sdk: ^3.11.3
+  sdk: ">=3.0.0 <4.0.0"
   flutter: ">=3.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
   navhost: ">=0.1.4"
-  collection: ">=1.17.0"
+  collection: ^1.18.0
 
 dev_dependencies:
   flutter_test:
